@@ -1,13 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StudySection, QuizQuestion, TrilingualText } from "../types";
 
-// Helper to validate and clean Ruby tags
-const cleanRuby = (html: string) => {
-  // Simple check to ensure we don't return completely broken HTML, 
-  // though the model is usually good at this with Schema.
-  return html;
-};
-
 export const generateExamOutline = async (examName: string): Promise<StudySection[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
