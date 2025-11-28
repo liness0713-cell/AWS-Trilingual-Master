@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BookOpen, CheckCircle, ChevronLeft, ChevronRight, Layers, Layout, ToggleLeft, ToggleRight, Brain } from 'lucide-react';
 import { AWS_EXAMS } from './constants';
 import { ExamDefinition, StudySection, QuizQuestion, TrilingualText } from './types';
