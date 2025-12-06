@@ -1,3 +1,4 @@
+
 export interface TrilingualText {
   en: string;
   zh: string;
@@ -7,7 +8,7 @@ export interface TrilingualText {
 export interface ExamDefinition {
   id: string;
   code: string;
-  name: string;
+  name: TrilingualText; // Changed from string to TrilingualText
   level: 'Foundational' | 'Associate' | 'Professional' | 'Specialty';
   description: string;
 }

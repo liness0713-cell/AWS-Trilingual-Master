@@ -1,80 +1,24 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { StudySection, QuizQuestion, TrilingualText } from "../types";
-
-export const generateExamOutline = async (examName: string): Promise<StudySection[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `Create a high-level study outline for the AWS ${examName} exam. 
-  Break it down into 4-6 main domains (Sections) as per the official guide.
-  For each domain, list 3-5 key topics.
-  
-  IMPORTANT: 
-  - Provide titles in English, Simplified Chinese, and Japanese.
-  - For Japanese text, YOU MUST use <ruby> tags for Kanji readings (Furigana). Example: <ruby>学習<rt>がくしゅう</rt></ruby>.
-  - Provide the approximate exam weightage (percentage) for each domain (e.g., "20%" or "24%").
-  - Ensure the JSON structure matches the schema exactly.
-  `;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: {
-              type: Type.OBJECT,
-              properties: {
-                en: { type: Type.STRING },
-                zh: { type: Type.STRING },
-                ja: { type: Type.STRING, description: "Japanese text with <ruby> tags for Kanji" }
-              },
-              required: ["en", "zh", "ja"]
-            },
-            weight: { type: Type.STRING, description: "The percentage weight of this domain, e.g. '20%'" },
-            topics: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: {
-                     type: Type.OBJECT,
-                     properties: {
-                      en: { type: Type.STRING },
-                      zh: { type: Type.STRING },
-                      ja: { type: Type.STRING, description: "Japanese text with <ruby> tags" }
-                     },
-                     required: ["en", "zh", "ja"]
-                  }
-                },
-                required: ["title"]
-              }
-            }
-          },
-          required: ["title", "topics", "weight"]
-        }
-      }
-    }
-  });
-
-  return JSON.parse(response.text || "[]");
-};
+import { QuizQuestion, TrilingualText } from "../types";
 
 export const generateTopicContent = async (examName: string, topicName: string): Promise<TrilingualText> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `Explain the topic "${topicName}" for the AWS ${examName} exam.
-  Provide a concise summary suitable for study review.
+  const prompt = `Create a COMPREHENSIVE and DETAILED study guide for the topic "${topicName}" for the AWS ${examName} exam.
   
-  Output in English, Simplified Chinese, and Japanese.
+  Requirements:
+  1. Structure the content with clear sections: "Introduction", "Key Concepts", "Use Cases", and "Exam Tips".
+  2. Output as HTML strings for ALL languages to support formatting.
+  3. Use <h3> for section headers, <ul>/<li> for bullet points, and <strong> for emphasis.
+  4. The content should be substantial (at least 300 words per language) and go deep into the technical details suitable for studying.
   
-  CRITICAL FOR JAPANESE:
-  - You MUST use standard HTML <ruby> tags for ALL Kanji characters to provide Furigana readings.
-  - Example: <ruby>機能<rt>きのう</rt></ruby>を利用<rt>りよう</rt>する。
-  - Do NOT use parentheses (). Use <ruby><rt> tags.
+  Languages:
+  - English
+  - Simplified Chinese
+  - Japanese (MUST use HTML <ruby> tags for ALL Kanji)
+
+  Example Japanese format: <h3><ruby>導入<rt>どうにゅう</rt></ruby></h3><p>...<ruby>機能<rt>きのう</rt></ruby>...</p>
   `;
 
   const response = await ai.models.generateContent({
@@ -85,9 +29,9 @@ export const generateTopicContent = async (examName: string, topicName: string):
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          en: { type: Type.STRING },
-          zh: { type: Type.STRING },
-          ja: { type: Type.STRING, description: "Japanese text containing HTML <ruby> tags for all Kanji" }
+          en: { type: Type.STRING, description: "Detailed HTML study content in English" },
+          zh: { type: Type.STRING, description: "Detailed HTML study content in Chinese" },
+          ja: { type: Type.STRING, description: "Detailed HTML study content in Japanese with <ruby> tags" }
         },
         required: ["en", "zh", "ja"]
       }
