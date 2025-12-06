@@ -22,3 +22,29 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Styles for injected TTS small buttons */
+.tts-small-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 999px;
+  color: #94a3b8; /* slate-400 */
+  background-color: transparent;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.tts-small-btn:hover {
+  color: #ea580c; /* orange-600 */
+  background-color: #ffedd5; /* orange-100 */
+  border-color: #fed7aa; /* orange-200 */
+  transform: scale(1.1);
+}
+
+/* Ensure no weird line-height issues with the inline button */
+.inline-audio-wrapper {
+  line-height: 0;
+}

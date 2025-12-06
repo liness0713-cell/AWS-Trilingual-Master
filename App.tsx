@@ -1,10 +1,11 @@
 
-import { useState } from 'react';
-import { BookOpen, CheckCircle, ChevronLeft, ChevronRight, Layers, ToggleLeft, ToggleRight, Brain, GraduationCap, PlayCircle, Home, Volume2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { BookOpen, CheckCircle, ChevronLeft, ChevronRight, Layers, ToggleLeft, ToggleRight, Brain, GraduationCap, PlayCircle, Home, Volume2, PlusCircle, Loader2 } from 'lucide-react';
 import { AWS_EXAMS, EXAM_STRUCTURES } from './constants';
 import { ExamDefinition, StudySection, QuizQuestion, TrilingualText } from './types';
 import * as GeminiService from './services/geminiService';
 import TrilingualBlock from './components/TrilingualBlock';
+import ContentWithAudio from './components/ContentWithAudio';
 
 const LoadingSpinner = ({ text }: { text: string }) => (
   <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -51,8 +52,12 @@ function App() {
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[] | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
-  const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isFullMockMode, setIsFullMockMode] = useState(false);
+  
+  // Ref for scrolling to explanation
+  const explanationRef = useRef<HTMLDivElement>(null);
 
   // --- Handlers ---
 
@@ -93,14 +98,14 @@ function App() {
     setCurrentView('QUIZ');
     setQuizQuestions(null);
     setAnswers([]);
-    setIsQuizSubmitted(false);
     setCurrentQuestionIndex(0);
+    setIsFullMockMode(isFullMock);
 
     if (selectedExam) {
       setIsLoadingQuiz(true);
       try {
         const domainName = isFullMock ? "All Domains (Full Mock)" : domain.title.en;
-        const count = isFullMock ? 10 : 5;
+        const count = 5; // Initial batch
         // Use English name for API prompt
         const questions = await GeminiService.generateQuiz(selectedExam.name.en, domainName, count);
         setQuizQuestions(questions);
@@ -112,21 +117,53 @@ function App() {
       }
     }
   };
+  
+  const handleLoadMoreQuestions = async () => {
+    if (!selectedExam || !activeDomain) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const domainName = isFullMockMode ? "All Domains (Full Mock)" : activeDomain.title.en;
+      const count = 5; // Load next batch
+      const newQuestions = await GeminiService.generateQuiz(selectedExam.name.en, domainName, count);
+      
+      setQuizQuestions(prev => prev ? [...prev, ...newQuestions] : newQuestions);
+      setAnswers(prev => [...prev, ...new Array(newQuestions.length).fill(-1)]);
+      // Auto advance to the first new question
+      setCurrentQuestionIndex(prev => prev + 1);
+    } catch (err) {
+      console.error("Failed to load more questions", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const handleAnswerSelect = (optionIndex: number) => {
-    if (isQuizSubmitted) return;
+    // Prevent changing answer if already answered
+    if (answers[currentQuestionIndex] !== -1) return;
+    
     const newAnswers = [...answers];
     newAnswers[currentQuestionIndex] = optionIndex;
     setAnswers(newAnswers);
+    
+    // Optional: Auto-scroll to explanation after a short delay
+    setTimeout(() => {
+        explanationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
   };
 
   const calculateScore = () => {
-    if (!quizQuestions) return 0;
+    if (!quizQuestions) return { score: 0, total: 0 };
     let score = 0;
+    let answeredCount = 0;
+    
     quizQuestions.forEach((q, idx) => {
-      if (answers[idx] === q.correctAnswerIndex) score++;
+      if (answers[idx] !== -1) {
+        answeredCount++;
+        if (answers[idx] === q.correctAnswerIndex) score++;
+      }
     });
-    return score;
+    return { score, total: answeredCount };
   };
 
   // --- TTS Helpers ---
@@ -345,9 +382,10 @@ function App() {
                    <Volume2 size={20} />
                  </button>
                </div>
-               <div 
+               <ContentWithAudio 
+                 htmlContent={activeTopicContent.en}
+                 lang="en-US"
                  className="text-lg text-gray-900 leading-relaxed prose prose-orange max-w-none"
-                 dangerouslySetInnerHTML={{ __html: activeTopicContent.en }} 
                />
             </div>
             
@@ -364,9 +402,10 @@ function App() {
                      <Volume2 size={16} />
                    </button>
                 </div>
-                <div 
+                <ContentWithAudio 
+                  htmlContent={activeTopicContent.zh}
+                  lang="zh-CN"
                   className="text-lg text-slate-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100 prose prose-slate max-w-none"
-                  dangerouslySetInnerHTML={{ __html: activeTopicContent.zh }}
                 />
               </div>
 
@@ -382,9 +421,11 @@ function App() {
                      <Volume2 size={16} />
                    </button>
                 </div>
-                <div 
-                   className={`text-lg text-slate-700 leading-9 bg-gray-50 p-4 rounded-lg border border-gray-100 prose prose-slate max-w-none ${!showFurigana ? 'furigana-hidden' : ''}`}
-                   dangerouslySetInnerHTML={{ __html: activeTopicContent.ja }}
+                <ContentWithAudio 
+                   htmlContent={activeTopicContent.ja}
+                   lang="ja-JP"
+                   showFurigana={showFurigana}
+                   className={`text-lg text-slate-700 leading-9 bg-gray-50 p-4 rounded-lg border border-gray-100 prose prose-slate max-w-none`}
                 />
               </div>
             </div>
@@ -405,154 +446,139 @@ function App() {
     </div>
   );
 
-  const renderQuiz = () => (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-       {renderHeader("Quiz Mode", activeDomain?.title.en || "Mock Exam", true)}
-       
-       {/* Added significantly more bottom padding (pb-40) to prevent footer overlap */}
-       <main className="flex-1 max-w-2xl mx-auto w-full p-4 sm:p-6 pb-40">
-         {isLoadingQuiz ? (
-           <LoadingSpinner text="AI is crafting challenging questions..." />
-         ) : quizQuestions ? (
-           <>
-             {/* Progress Info */}
-             <div className="flex justify-between items-end mb-4 px-1">
-                <div>
-                   <span className="text-3xl font-bold text-slate-800">
-                     {currentQuestionIndex + 1}
-                   </span>
-                   <span className="text-gray-400 text-lg"> / {quizQuestions.length}</span>
-                </div>
-                {isQuizSubmitted && (
+  const renderQuiz = () => {
+    const { score, total } = calculateScore();
+    const isAnswered = quizQuestions ? answers[currentQuestionIndex] !== -1 : false;
+
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+         {renderHeader("Quiz Mode", activeDomain?.title.en || "Mock Exam", true)}
+         
+         <main className="flex-1 max-w-2xl mx-auto w-full p-4 sm:p-6 pb-12">
+           {isLoadingQuiz ? (
+             <LoadingSpinner text="AI is crafting challenging questions..." />
+           ) : quizQuestions && quizQuestions.length > 0 ? (
+             <>
+               {/* Progress Info */}
+               <div className="flex justify-between items-end mb-4 px-1">
+                  <div>
+                     <span className="text-3xl font-bold text-slate-800">
+                       {currentQuestionIndex + 1}
+                     </span>
+                     <span className="text-gray-400 text-lg"> / {quizQuestions.length}</span>
+                  </div>
                   <div className="text-right">
                     <span className="text-sm text-gray-500 block">Score</span>
-                    <span className="text-xl font-bold text-orange-600">{calculateScore()} pts</span>
+                    <span className="text-xl font-bold text-orange-600">{score} <span className="text-gray-400 text-base font-normal">/ {total}</span></span>
                   </div>
-                )}
-             </div>
-
-             <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
-                <div 
-                  className="bg-orange-500 h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%` }}
-                ></div>
-             </div>
-
-             {/* Question Card */}
-             <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
-                <div className="p-6 border-b border-gray-100 bg-slate-50">
-                   <TrilingualBlock 
-                      content={quizQuestions[currentQuestionIndex].question} 
-                      showFurigana={showFurigana}
-                      variant="title"
-                   />
-                </div>
-
-                <div className="p-4 sm:p-6 space-y-3">
-                  {quizQuestions[currentQuestionIndex].options.map((option, idx) => {
-                    const isSelected = answers[currentQuestionIndex] === idx;
-                    const isCorrect = quizQuestions[currentQuestionIndex].correctAnswerIndex === idx;
-                    
-                    let styleClass = "w-full text-left p-4 rounded-xl border-2 transition-all relative overflow-hidden ";
-                    
-                    if (isQuizSubmitted) {
-                      if (isCorrect) styleClass += "border-green-500 bg-green-50 ring-1 ring-green-500";
-                      else if (isSelected && !isCorrect) styleClass += "border-red-500 bg-red-50";
-                      else styleClass += "border-gray-100 opacity-50 grayscale";
-                    } else {
-                      if (isSelected) styleClass += "border-orange-500 bg-orange-50 shadow-md transform scale-[1.01]";
-                      else styleClass += "border-gray-200 hover:border-orange-200 hover:bg-gray-50";
-                    }
-
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleAnswerSelect(idx)}
-                        disabled={isQuizSubmitted}
-                        className={styleClass}
-                      >
-                         <div className="flex items-start gap-3 relative z-10">
-                           <div className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                             isSelected 
-                               ? isQuizSubmitted && !isCorrect ? 'border-red-500 bg-red-500 text-white' : 'border-orange-500 bg-orange-500 text-white'
-                               : isQuizSubmitted && isCorrect ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300'
-                           }`}>
-                             {isQuizSubmitted && isCorrect ? <CheckCircle size={14} /> : isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+               </div>
+  
+               <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
+                  <div 
+                    className="bg-orange-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%` }}
+                  ></div>
+               </div>
+  
+               {/* Question Card */}
+               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
+                  <div className="p-6 border-b border-gray-100 bg-slate-50">
+                     <TrilingualBlock 
+                        content={quizQuestions[currentQuestionIndex].question} 
+                        showFurigana={showFurigana}
+                        variant="title"
+                     />
+                  </div>
+  
+                  <div className="p-4 sm:p-6 space-y-3">
+                    {quizQuestions[currentQuestionIndex].options.map((option, idx) => {
+                      const isSelected = answers[currentQuestionIndex] === idx;
+                      const isCorrect = quizQuestions[currentQuestionIndex].correctAnswerIndex === idx;
+                      
+                      let styleClass = "w-full text-left p-4 rounded-xl border-2 transition-all relative overflow-hidden ";
+                      
+                      if (isAnswered) {
+                        if (isCorrect) styleClass += "border-green-500 bg-green-50 ring-1 ring-green-500";
+                        else if (isSelected && !isCorrect) styleClass += "border-red-500 bg-red-50";
+                        else styleClass += "border-gray-100 opacity-50 grayscale";
+                      } else {
+                        if (isSelected) styleClass += "border-orange-500 bg-orange-50 shadow-md transform scale-[1.01]";
+                        else styleClass += "border-gray-200 hover:border-orange-200 hover:bg-gray-50";
+                      }
+  
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleAnswerSelect(idx)}
+                          // REMOVED disabled={isAnswered} to allow child events (TTS) to fire
+                          className={`${styleClass} ${isAnswered ? 'cursor-default' : 'cursor-pointer'}`}
+                        >
+                           <div className="flex items-start gap-3 relative z-10">
+                             <div className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                               isSelected 
+                                 ? isAnswered && !isCorrect ? 'border-red-500 bg-red-500 text-white' : 'border-orange-500 bg-orange-500 text-white'
+                                 : isAnswered && isCorrect ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300'
+                             }`}>
+                               {isAnswered && isCorrect ? <CheckCircle size={14} /> : isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                             </div>
+                             <TrilingualBlock content={option} showFurigana={showFurigana} className="flex-1" />
                            </div>
-                           <TrilingualBlock content={option} showFurigana={showFurigana} className="flex-1" />
-                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
-             </div>
-
-             {/* Explanation */}
-             {isQuizSubmitted && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-24 animate-fade-in">
-                   <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
-                     <CheckCircle size={20}/> Explanation
-                   </h4>
-                   <TrilingualBlock 
-                     content={quizQuestions[currentQuestionIndex].explanation} 
-                     showFurigana={showFurigana} 
-                   />
-                </div>
-             )}
-           </>
-         ) : (
-           <div className="text-center py-12 text-gray-500">Failed to load quiz.</div>
-         )}
-       </main>
-
-       {/* Floating Bottom Bar for Quiz Controls */}
-       {quizQuestions && (
-         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-30">
-            <div className="max-w-2xl mx-auto flex justify-between gap-4">
-              <button
-                onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
-                disabled={currentQuestionIndex === 0}
-                className="flex-1 py-3 text-gray-600 font-bold rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-30"
-              >
-                Previous
-              </button>
-
-              {!isQuizSubmitted ? (
-                 currentQuestionIndex === quizQuestions.length - 1 ? (
-                   <button
-                     onClick={() => setIsQuizSubmitted(true)}
-                     disabled={answers[currentQuestionIndex] === -1} // Require answer to submit? Optional.
-                     className="flex-[2] py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-lg shadow-green-200 disabled:opacity-50 disabled:shadow-none"
-                   >
-                     Submit Exam
-                   </button>
-                 ) : (
+                        </button>
+                      );
+                    })}
+                  </div>
+               </div>
+  
+               {/* Explanation (Immediate Feedback) */}
+               {isAnswered && (
+                  <div ref={explanationRef} className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8 animate-fade-in scroll-mt-24">
+                     <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                       <CheckCircle size={20}/> Explanation
+                     </h4>
+                     <TrilingualBlock 
+                       content={quizQuestions[currentQuestionIndex].explanation} 
+                       showFurigana={showFurigana} 
+                     />
+                  </div>
+               )}
+  
+               {/* Navigation Buttons */}
+               <div className="mt-8 flex flex-col sm:flex-row justify-between gap-4">
+                <button
+                  onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
+                  disabled={currentQuestionIndex === 0}
+                  className="flex-1 py-3 text-gray-600 font-bold rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-30 bg-white shadow-sm"
+                >
+                  Previous
+                </button>
+  
+                {currentQuestionIndex === quizQuestions.length - 1 ? (
+                  <button
+                     onClick={handleLoadMoreQuestions}
+                     disabled={!isAnswered || isLoadingMore}
+                     className="flex-[2] py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
+                  >
+                    {isLoadingMore ? <Loader2 className="animate-spin" /> : <PlusCircle size={18} />}
+                    {isLoadingMore ? "Generating..." : "Generate More Questions"}
+                  </button>
+                ) : (
                   <button
                     onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
-                    className="flex-[2] py-3 bg-orange-600 text-white font-bold rounded-lg hover:bg-orange-700 shadow-lg shadow-orange-200 flex items-center justify-center gap-2"
+                    disabled={!isAnswered}
+                    className="flex-[2] py-3 bg-orange-600 text-white font-bold rounded-lg hover:bg-orange-700 shadow-lg shadow-orange-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none disabled:bg-gray-300 disabled:text-gray-500"
                   >
-                    Next <ChevronRight size={18} />
+                    Next Question <ChevronRight size={18} />
                   </button>
-                 )
-              ) : (
-                <button
-                  onClick={() => {
-                    if (currentQuestionIndex < quizQuestions.length - 1) {
-                      setCurrentQuestionIndex(currentQuestionIndex + 1);
-                    } else {
-                       setCurrentView('DASHBOARD');
-                    }
-                  }}
-                  className="flex-[2] py-3 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 flex items-center justify-center gap-2"
-                >
-                   {currentQuestionIndex < quizQuestions.length - 1 ? "Next Question" : "Finish Review"} <ChevronRight size={18} />
-                </button>
-              )}
-            </div>
-         </div>
-       )}
-    </div>
-  );
+                )}
+              </div>
+             </>
+           ) : (
+             <div className="text-center py-12 text-gray-500">Failed to load quiz.</div>
+           )}
+         </main>
+      </div>
+    );
+  };
 
   return (
     <>
