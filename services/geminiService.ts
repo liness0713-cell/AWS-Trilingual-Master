@@ -2,6 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizQuestion, TrilingualText } from "../types";
 
+// Helper to strip Markdown formatting (```json ... ```) from the response text
+const cleanJson = (text: string | undefined): string => {
+  if (!text) return "";
+  let clean = text.trim();
+  // Remove starting ```json or ```
+  clean = clean.replace(/^```(json)?\s*/, "");
+  // Remove ending ```
+  clean = clean.replace(/\s*```$/, "");
+  return clean;
+};
+
 export const generateTopicContent = async (examName: string, topicName: string): Promise<TrilingualText> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
@@ -38,7 +49,8 @@ export const generateTopicContent = async (examName: string, topicName: string):
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  const cleanedText = cleanJson(response.text);
+  return JSON.parse(cleanedText || "{}");
 };
 
 export const generateQuiz = async (examName: string, domainName: string, count: number = 3): Promise<QuizQuestion[]> => {
@@ -103,5 +115,6 @@ export const generateQuiz = async (examName: string, domainName: string, count: 
     }
   });
 
-  return JSON.parse(response.text || "[]");
+  const cleanedText = cleanJson(response.text);
+  return JSON.parse(cleanedText || "[]");
 };
