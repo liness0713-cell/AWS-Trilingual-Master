@@ -33,71 +33,78 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
     container.innerHTML = htmlContent;
 
     // 2. Identify delimiters based on language
-    // En: . ? ! (followed by space or end of line)
-    // Zh/Ja: 。 ？ ！
     const isAsian = lang === 'zh-CN' || lang === 'ja-JP';
     const delimiterRegex = isAsian ? /([。？！])/ : /([\.\?\!])(\s+|$)/;
 
-    // 3. Process block elements (p, li, etc) to scope sentences
+    // 3. Process block elements to find text nodes
     const blocks = container.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, blockquote, div');
 
     const processBlock = (block: Element) => {
-      // Skip if block only contains other blocks (approximate check)
+      // Skip if block contains other block-level elements (approximate check)
       if (block.querySelector('p, li')) return;
 
-      // Snapshot child nodes because we will be adding nodes
+      // 3a. Snapshot all text nodes first. 
+      // Modifying the DOM while walking it with TreeWalker can be dangerous/buggy.
+      const textNodes: Text[] = [];
       const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-      let currentNode: Node | null = walker.nextNode();
-      
-      while (currentNode) {
-        const text = currentNode.textContent || '';
-        const match = delimiterRegex.exec(text);
-
-        if (match) {
-          // Found a sentence end.
-          const index = match.index;
-          const punctuationLength = match[0].length; 
-          const splitIndex = index + punctuationLength;
-
-          // Split the text node
-          const textNode = currentNode as Text;
-          // splitText divides the node. original textNode keeps the first part (sentence + punct).
-          // remainingTextNode is the new node with the rest of the text.
-          const remainingTextNode = textNode.splitText(splitIndex);
-          
-          // Insert the button container after the current text node (which now ends with punctuation)
-          const btnContainer = document.createElement('span');
-          btnContainer.className = 'inline-audio-wrapper';
-          btnContainer.style.marginLeft = '4px';
-          btnContainer.style.marginRight = '4px';
-          btnContainer.style.verticalAlign = 'middle';
-          btnContainer.style.display = 'inline-block';
-          
-          block.insertBefore(btnContainer, remainingTextNode);
-
-          // Render the React icon into this span
-          btnContainer.innerHTML = `<button class="tts-small-btn" aria-label="Play sentence"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-volume-2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>`;
-
-          // Move current processing to the remaining part
-          currentNode = remainingTextNode;
-        } else {
-          // If no match in this node, move to the next text node in the tree
-          currentNode = walker.nextNode();
-        }
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode as Text);
       }
 
-      // After injecting buttons, we need to attach data-text to them.
-      // We iterate the block's children, accumulating text.
-      // When we hit a .inline-audio-wrapper, we assign the accumulator to it and reset.
-      
+      // 3b. Process each original text node
+      textNodes.forEach(originalNode => {
+        let currentNode = originalNode;
+        
+        // Loop to handle multiple sentences within a single text node
+        while (true) {
+          const text = currentNode.textContent || '';
+          const match = delimiterRegex.exec(text);
+
+          if (match) {
+            const index = match.index;
+            const punctuationLength = match[0].length; 
+            const splitIndex = index + punctuationLength;
+
+            // Split the text node:
+            // Part 1 (currentNode): "Sentence."
+            // Part 2 (remainingTextNode): " Next sentence."
+            const remainingTextNode = currentNode.splitText(splitIndex);
+            
+            // Insert the button container after the sentence
+            const btnContainer = document.createElement('span');
+            btnContainer.className = 'inline-audio-wrapper';
+            btnContainer.style.marginLeft = '4px';
+            btnContainer.style.marginRight = '4px';
+            btnContainer.style.verticalAlign = 'middle';
+            btnContainer.style.display = 'inline-block';
+            
+            // Insert in DOM: [Sentence.] [Button] [ Next Sentence.]
+            // CRITICAL FIX: Insert into the specific parent of the text node, not the block container.
+            // The text node might be inside a <b>, <i>, or <rt> tag nested within the block.
+            if (currentNode.parentNode) {
+              currentNode.parentNode.insertBefore(btnContainer, remainingTextNode);
+            }
+
+            btnContainer.innerHTML = `<button class="tts-small-btn" aria-label="Play sentence"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-volume-2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>`;
+
+            // Continue the loop with the remaining part of the text
+            currentNode = remainingTextNode;
+          } else {
+            // No more delimiters in this node, move to the next original node in outer loop
+            break;
+          }
+        }
+      });
+
+      // 4. Attach click handlers to the injected buttons
+      // We traverse the block again to reconstruct the full sentences for the buttons
       let textAccumulator = '';
       
-      // Helper recursive walker for extraction
       const walkForExtraction = (node: Node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement;
           if (el.classList.contains('inline-audio-wrapper')) {
-            // Found a button! Assign text and reset.
+            // Found a button! Assign accumulated text and reset.
             const btn = el.querySelector('button');
             if (btn) {
               const sentenceText = textAccumulator.trim();
@@ -114,7 +121,7 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
             return;
           }
           
-          if (el.tagName.toLowerCase() === 'rt') return; // Skip ruby
+          if (el.tagName.toLowerCase() === 'rt') return; // Skip ruby text
           
           node.childNodes.forEach(walkForExtraction);
         } else if (node.nodeType === Node.TEXT_NODE) {
@@ -122,7 +129,6 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
         }
       };
 
-      // Run extraction
       block.childNodes.forEach(walkForExtraction);
     };
 

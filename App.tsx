@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { BookOpen, CheckCircle, ChevronLeft, ChevronRight, Layers, ToggleLeft, ToggleRight, Brain, GraduationCap, PlayCircle, Home, Volume2, PlusCircle, Loader2 } from 'lucide-react';
 import { AWS_EXAMS, EXAM_STRUCTURES } from './constants';
 import { ExamDefinition, StudySection, QuizQuestion, TrilingualText } from './types';

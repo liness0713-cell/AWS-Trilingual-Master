@@ -2,15 +2,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizQuestion, TrilingualText } from "../types";
 
-// Helper to strip Markdown formatting (```json ... ```) from the response text
+// Helper to extract the JSON part from the response text
 const cleanJson = (text: string | undefined): string => {
   if (!text) return "";
-  let clean = text.trim();
-  // Remove starting ```json or ```
-  clean = clean.replace(/^```(json)?\s*/, "");
-  // Remove ending ```
-  clean = clean.replace(/\s*```$/, "");
-  return clean;
+  
+  // Locate the first opening brace/bracket
+  const startObject = text.indexOf('{');
+  const startArray = text.indexOf('[');
+  
+  let startIndex = -1;
+  // Determine if it's an object or array starting first
+  if (startObject !== -1 && startArray !== -1) {
+    startIndex = Math.min(startObject, startArray);
+  } else if (startObject !== -1) {
+    startIndex = startObject;
+  } else if (startArray !== -1) {
+    startIndex = startArray;
+  }
+  
+  if (startIndex === -1) {
+    // Fallback: just strip markdown code blocks if no clear JSON start found
+    return text.replace(/```(json)?/g, "").replace(/```/g, "").trim();
+  }
+  
+  // Determine the expected closing character based on the start
+  const isArray = text[startIndex] === '[';
+  const lastIndex = text.lastIndexOf(isArray ? ']' : '}');
+  
+  if (lastIndex === -1) return text;
+  
+  return text.substring(startIndex, lastIndex + 1);
 };
 
 export const generateTopicContent = async (examName: string, topicName: string): Promise<TrilingualText> => {
