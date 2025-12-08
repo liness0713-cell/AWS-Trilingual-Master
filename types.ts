@@ -21,7 +21,7 @@ export interface StudySection {
 
 export interface StudyTopic {
   title: TrilingualText;
-  content?: TrilingualText; // Loaded dynamically
+  content?: TrilingualText[]; // Changed from TrilingualText to TrilingualText[] (Array of blocks)
 }
 
 export interface QuizQuestion {

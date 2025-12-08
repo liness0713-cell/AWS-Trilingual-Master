@@ -34,23 +34,28 @@ const cleanJson = (text: string | undefined): string => {
   return text.substring(startIndex, lastIndex + 1);
 };
 
-export const generateTopicContent = async (examName: string, topicName: string): Promise<TrilingualText> => {
+export const generateTopicContent = async (examName: string, topicName: string): Promise<TrilingualText[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `Create a COMPREHENSIVE and DETAILED study guide for the topic "${topicName}" for the AWS ${examName} exam.
   
   Requirements:
-  1. Structure the content with clear sections: "Introduction", "Key Concepts", "Use Cases", and "Exam Tips".
-  2. Output as HTML strings for ALL languages to support formatting.
-  3. Use <h3> for section headers, <ul>/<li> for bullet points, and <strong> for emphasis.
-  4. The content should be substantial (at least 300 words per language) and go deep into the technical details suitable for studying.
+  1. Break the content down into logical BLOCKS (Headers, Paragraphs, or Lists).
+  2. For EACH block, provide the content in English, Chinese, and Japanese.
+  3. The output must be a JSON ARRAY of these blocks.
+  4. Use HTML tags WITHIN the strings to format content (e.g., "<h3>Introduction</h3>", "<p>This service is...</p>", "<ul><li>Point 1</li></ul>").
+  5. The content should be substantial and go deep into technical details.
   
-  Languages:
-  - English
-  - Simplified Chinese
-  - Japanese (MUST use HTML <ruby> tags for ALL Kanji)
+  Languages details:
+  - English: Primary content.
+  - Simplified Chinese: Accurate technical translation.
+  - Japanese: MUST use HTML <ruby> tags for ALL Kanji (e.g., <ruby>機能<rt>きのう</rt></ruby>).
 
-  Example Japanese format: <h3><ruby>導入<rt>どうにゅう</rt></ruby></h3><p>...<ruby>機能<rt>きのう</rt></ruby>...</p>
+  Example JSON Structure:
+  [
+    { "en": "<h3>Introduction</h3>", "zh": "<h3>介绍</h3>", "ja": "<h3><ruby>導入<rt>どうにゅう</rt></ruby></h3>" },
+    { "en": "<p>Content...</p>", "zh": "<p>Content...</p>", "ja": "<p>Content...</p>" }
+  ]
   `;
 
   const response = await ai.models.generateContent({
@@ -59,19 +64,22 @@ export const generateTopicContent = async (examName: string, topicName: string):
     config: {
       responseMimeType: 'application/json',
       responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          en: { type: Type.STRING, description: "Detailed HTML study content in English" },
-          zh: { type: Type.STRING, description: "Detailed HTML study content in Chinese" },
-          ja: { type: Type.STRING, description: "Detailed HTML study content in Japanese with <ruby> tags" }
-        },
-        required: ["en", "zh", "ja"]
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            en: { type: Type.STRING, description: "HTML content block in English" },
+            zh: { type: Type.STRING, description: "HTML content block in Chinese" },
+            ja: { type: Type.STRING, description: "HTML content block in Japanese with <ruby> tags" }
+          },
+          required: ["en", "zh", "ja"]
+        }
       }
     }
   });
 
   const cleanedText = cleanJson(response.text);
-  return JSON.parse(cleanedText || "{}");
+  return JSON.parse(cleanedText || "[]");
 };
 
 export const generateQuiz = async (examName: string, domainName: string, count: number = 3): Promise<QuizQuestion[]> => {

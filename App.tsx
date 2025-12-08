@@ -45,7 +45,8 @@ function App() {
 
   // Content State
   const [showFurigana, setShowFurigana] = useState(true);
-  const [activeTopicContent, setActiveTopicContent] = useState<TrilingualText | null>(null);
+  // Changed: activeTopicContent is now an array of blocks
+  const [activeTopicContent, setActiveTopicContent] = useState<TrilingualText[] | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
 
   // Quiz State
@@ -370,67 +371,53 @@ function App() {
         {isLoadingContent ? (
           <LoadingSpinner text="AI is generating your study guide..." />
         ) : activeTopicContent ? (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-            <div className="bg-orange-50/50 p-6 border-b border-gray-100">
-               <div className="flex justify-between items-start mb-2">
-                 <span className="text-xs font-bold text-orange-600 uppercase tracking-wider">Topic Overview</span>
-                 <button 
-                   onClick={() => handleSpeak(activeTopicContent.en, 'en-US')}
-                   className="text-orange-400 hover:text-orange-600 p-1 rounded-full hover:bg-orange-100 transition-colors"
-                   title="Read English"
-                 >
-                   <Volume2 size={20} />
-                 </button>
-               </div>
-               <ContentWithAudio 
-                 htmlContent={activeTopicContent.en}
-                 lang="en-US"
-                 className="text-lg text-gray-900 leading-relaxed prose prose-orange max-w-none"
-               />
-            </div>
-            
-            <div className="p-6 sm:p-8 space-y-8">
-              {/* Chinese Section */}
-              <div>
-                <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
-                   <h3 className="text-sm font-semibold text-gray-400 uppercase">Chinese</h3>
-                   <button 
-                     onClick={() => handleSpeak(activeTopicContent.zh, 'zh-CN')}
-                     className="text-gray-400 hover:text-orange-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
-                     title="Read Chinese"
-                   >
-                     <Volume2 size={16} />
-                   </button>
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden p-4 sm:p-8 space-y-8">
+            {/* Interleaved Content Rendering */}
+            {activeTopicContent.map((block, idx) => (
+              <div key={idx} className="group transition-all">
+                {/* Main English Content */}
+                <div className="mb-2 relative">
+                   <div className="absolute -left-6 top-0 hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button 
+                        onClick={() => handleSpeak(block.en, 'en-US')}
+                        className="text-orange-400 hover:text-orange-600 p-1"
+                        title="Read English"
+                     >
+                       <Volume2 size={16} />
+                     </button>
+                   </div>
+                   <ContentWithAudio 
+                     htmlContent={block.en}
+                     lang="en-US"
+                     className="text-lg text-gray-900 leading-relaxed prose prose-orange max-w-none"
+                   />
                 </div>
-                <ContentWithAudio 
-                  htmlContent={activeTopicContent.zh}
-                  lang="zh-CN"
-                  className="text-lg text-slate-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-100 prose prose-slate max-w-none"
-                />
-              </div>
 
-              {/* Japanese Section */}
-              <div>
-                <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
-                   <h3 className="text-sm font-semibold text-gray-400 uppercase">Japanese</h3>
-                   <button 
-                     onClick={() => handleSpeak(activeTopicContent.ja, 'ja-JP')}
-                     className="text-gray-400 hover:text-orange-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
-                     title="Read Japanese"
-                   >
-                     <Volume2 size={16} />
-                   </button>
+                {/* Indented Translations Container */}
+                <div className="flex flex-col gap-3 pl-4 sm:pl-6 border-l-2 border-orange-100 mt-3">
+                   {/* Chinese */}
+                   <div className="relative">
+                      <ContentWithAudio 
+                        htmlContent={block.zh}
+                        lang="zh-CN"
+                        className="text-base text-slate-600 leading-relaxed prose prose-slate max-w-none"
+                      />
+                   </div>
+
+                   {/* Japanese */}
+                   <div className="relative">
+                      <ContentWithAudio 
+                        htmlContent={block.ja}
+                        lang="ja-JP"
+                        showFurigana={showFurigana}
+                        className="text-base text-slate-600 leading-9 prose prose-slate max-w-none"
+                      />
+                   </div>
                 </div>
-                <ContentWithAudio 
-                   htmlContent={activeTopicContent.ja}
-                   lang="ja-JP"
-                   showFurigana={showFurigana}
-                   className={`text-lg text-slate-700 leading-9 bg-gray-50 p-4 rounded-lg border border-gray-100 prose prose-slate max-w-none`}
-                />
               </div>
-            </div>
+            ))}
             
-            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-center">
+            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-center mt-8 rounded-lg">
               <button 
                 onClick={() => setCurrentView('DASHBOARD')}
                 className="text-gray-600 hover:text-orange-600 font-medium text-sm flex items-center gap-1"
