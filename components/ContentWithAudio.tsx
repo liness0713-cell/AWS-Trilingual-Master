@@ -17,58 +17,52 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleSpeak = (text: string) => {
-     // 第1步：显示当前状态
-  alert(`🔊 TTS开始\n当前状态:\nspeaking: ${window.speechSynthesis.speaking}\npending: ${window.speechSynthesis.pending}\npaused: ${window.speechSynthesis.paused}`);
+  
   
   window.speechSynthesis.cancel();
 
-  setTimeout(() => {
-    // 第2步：检查语音列表
+  // 等待并重试获取语音列表
+  const trySpeak = (retries = 0) => {
     const voices = window.speechSynthesis.getVoices();
     
-    if (voices.length === 0) {
-      alert('❌ 错误：语音列表为空！\nvoices.length = 0');
+    if (voices.length === 0 && retries < 5) {
+      // 还没加载，再等等
+      if (retries === 0) {
+        alert(`⏳ 正在加载语音...\n第${retries + 1}次尝试`);
+      }
+      setTimeout(() => trySpeak(retries + 1), 300);
       return;
     }
     
-    // 显示语音信息
-    const voiceInfo = voices.map((v, i) => `${i+1}. ${v.name} (${v.lang})`).join('\n');
-    alert(`✅ 找到 ${voices.length} 个语音:\n${voiceInfo.slice(0, 200)}...`); // 只显示前200字符
+    if (voices.length === 0) {
+      alert('❌ 语音加载失败！\n请检查系统TTS设置');
+      return;
+    }
+    
+    // 成功获取语音列表
+    alert(`✅ 找到 ${voices.length} 个语音`);
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
     utterance.rate = 1.0;
     
-    // 尝试手动指定语音
     const voice = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
     if (voice) {
       utterance.voice = voice;
-      alert(`🎤 使用语音: ${voice.name}`);
-    } else {
-      alert(`⚠️ 未找到匹配语言 ${lang} 的语音`);
+      alert(`🎤 使用: ${voice.name}`);
     }
-    
-    // 事件监听
-    utterance.onstart = () => {
-      alert('✅ TTS开始播放！');
-    };
-    
-    utterance.onend = () => {
-      alert('✅ TTS播放完成！');
-    };
     
     utterance.onerror = (event) => {
-      alert(`❌ TTS错误!\nerror: ${event.error}\nmessage: ${event || '无消息'}`);
+      alert(`❌ 错误: ${event.error}`);
     };
     
-    // 第3步：检查是否可以播放
     if (!window.speechSynthesis.speaking) {
-      alert('🎤 即将调用 speak()');
       window.speechSynthesis.speak(utterance);
-    } else {
-      alert('⚠️ 警告：仍在播放中，无法启动新播放');
     }
-  }, 150);
+  };
+  
+  setTimeout(() => trySpeak(), 150);
+  
   };
 
   useEffect(() => {
