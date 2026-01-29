@@ -58,7 +58,7 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
     };
     
     utterance.onerror = (event) => {
-      alert(`❌ TTS错误!\nerror: ${event.error}\nmessage: ${event.message || '无消息'}`);
+      alert(`❌ TTS错误!\nerror: ${event.error}\nmessage: ${event || '无消息'}`);
     };
     
     // 第3步：检查是否可以播放
