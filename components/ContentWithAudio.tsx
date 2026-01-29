@@ -18,10 +18,18 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
 
   const handleSpeak = (text: string) => {
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
-    utterance.rate = 1.0;
-    window.speechSynthesis.speak(utterance);
+
+    // 等待取消完成 / キャンセル完了(かんりょう)を待(ま)つ / Wait for cancel to complete
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      utterance.rate = 1.0;
+      
+      // 可选：检查是否真的停止了 / オプション：本当(ほんとう)に停止(ていし)したか確認(かくにん) / Optional: verify it stopped
+      if (!window.speechSynthesis.speaking) {
+        window.speechSynthesis.speak(utterance);
+      }
+    }, 150);
   };
 
   useEffect(() => {

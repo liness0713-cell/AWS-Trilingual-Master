@@ -471,20 +471,20 @@ function App() {
             </div>
           </div>
         ) : (
-          <div>
-          <div className="text-center py-12 text-gray-500">Failed to load content.</div>
-          <button 
-                onClick={() => {
-                   if (activeDomain && activeTopicTitle) {
-                     handleStudyTopic(activeDomain, activeTopicTitle, true);
-                   }
-                }}
-                className="text-orange-600 hover:text-orange-800 font-semibold text-sm flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors"
-                title="Force refresh content using AI"
-              >
-                <RefreshCw size={16} /> Regenerate with AI
+            <div>
+              <div className="text-center py-12 text-gray-500">Failed to load content.</div>
+              <button 
+                    onClick={() => {
+                      if (activeDomain && activeTopicTitle) {
+                        handleStudyTopic(activeDomain, activeTopicTitle, true);
+                      }
+                    }}
+                    className="text-orange-600 hover:text-orange-800 font-semibold text-sm flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors"
+                    title="Force refresh content using AI"
+                  >
+                    <RefreshCw size={16} /> Regenerate with AI
               </button>
-               </div>
+            </div>
         )}
       </main>
     </div>
