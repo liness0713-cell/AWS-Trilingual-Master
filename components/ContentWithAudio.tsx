@@ -17,19 +17,58 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleSpeak = (text: string) => {
-    window.speechSynthesis.cancel();
+     // 第1步：显示当前状态
+  alert(`🔊 TTS开始\n当前状态:\nspeaking: ${window.speechSynthesis.speaking}\npending: ${window.speechSynthesis.pending}\npaused: ${window.speechSynthesis.paused}`);
+  
+  window.speechSynthesis.cancel();
 
-    // 等待取消完成 / キャンセル完了(かんりょう)を待(ま)つ / Wait for cancel to complete
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang;
-      utterance.rate = 1.0;
-      
-      // 可选：检查是否真的停止了 / オプション：本当(ほんとう)に停止(ていし)したか確認(かくにん) / Optional: verify it stopped
-      if (!window.speechSynthesis.speaking) {
-        window.speechSynthesis.speak(utterance);
-      }
-    }, 150);
+  setTimeout(() => {
+    // 第2步：检查语音列表
+    const voices = window.speechSynthesis.getVoices();
+    
+    if (voices.length === 0) {
+      alert('❌ 错误：语音列表为空！\nvoices.length = 0');
+      return;
+    }
+    
+    // 显示语音信息
+    const voiceInfo = voices.map((v, i) => `${i+1}. ${v.name} (${v.lang})`).join('\n');
+    alert(`✅ 找到 ${voices.length} 个语音:\n${voiceInfo.slice(0, 200)}...`); // 只显示前200字符
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.rate = 1.0;
+    
+    // 尝试手动指定语音
+    const voice = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+    if (voice) {
+      utterance.voice = voice;
+      alert(`🎤 使用语音: ${voice.name}`);
+    } else {
+      alert(`⚠️ 未找到匹配语言 ${lang} 的语音`);
+    }
+    
+    // 事件监听
+    utterance.onstart = () => {
+      alert('✅ TTS开始播放！');
+    };
+    
+    utterance.onend = () => {
+      alert('✅ TTS播放完成！');
+    };
+    
+    utterance.onerror = (event) => {
+      alert(`❌ TTS错误!\nerror: ${event.error}\nmessage: ${event.message || '无消息'}`);
+    };
+    
+    // 第3步：检查是否可以播放
+    if (!window.speechSynthesis.speaking) {
+      alert('🎤 即将调用 speak()');
+      window.speechSynthesis.speak(utterance);
+    } else {
+      alert('⚠️ 警告：仍在播放中，无法启动新播放');
+    }
+  }, 150);
   };
 
   useEffect(() => {
