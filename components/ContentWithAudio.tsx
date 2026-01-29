@@ -17,52 +17,11 @@ const ContentWithAudio: React.FC<ContentWithAudioProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleSpeak = (text: string) => {
-  
-  
-  window.speechSynthesis.cancel();
-
-  // 等待并重试获取语音列表
-  const trySpeak = (retries = 0) => {
-    const voices = window.speechSynthesis.getVoices();
-    
-    if (voices.length === 0 && retries < 5) {
-      // 还没加载，再等等
-      if (retries === 0) {
-        alert(`⏳ 正在加载语音...\n第${retries + 1}次尝试`);
-      }
-      setTimeout(() => trySpeak(retries + 1), 300);
-      return;
-    }
-    
-    if (voices.length === 0) {
-      alert('❌ 语音加载失败！\n请检查系统TTS设置');
-      return;
-    }
-    
-    // 成功获取语音列表
-    alert(`✅ 找到 ${voices.length} 个语音`);
-    
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
     utterance.rate = 1.0;
-    
-    const voice = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-    if (voice) {
-      utterance.voice = voice;
-      alert(`🎤 使用: ${voice.name}`);
-    }
-    
-    utterance.onerror = (event) => {
-      alert(`❌ 错误: ${event.error}`);
-    };
-    
-    if (!window.speechSynthesis.speaking) {
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-  
-  setTimeout(() => trySpeak(), 150);
-  
+    window.speechSynthesis.speak(utterance);
   };
 
   useEffect(() => {
