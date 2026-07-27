@@ -24,7 +24,7 @@ const Footer = () => (
       <div className="text-sm font-medium">
         <span className="text-slate-500 mr-2">Friendly Link:</span>
         <a 
-          href="https://my-portfolio-beige-five-56.vercel.app/" 
+          href="https://blog.gyuba-chan.com/" 
           target="_blank" 
           rel="noopener noreferrer"
           className="text-orange-400 hover:text-orange-300 hover:underline transition-colors"
